@@ -24,6 +24,7 @@
 #include "vmsystem.h"
 #include "vmtimer.h"
 #include "stdio.h"
+#include "string.h"
 
 
 static void app_client_check_bt_on_off(void);
@@ -120,24 +121,24 @@ void vm_main(void)
 
 void app_client_callback_init(vm_bt_gatt_client_callback_t *gattc_cb)
 {
-    gattc_cb->register_client = app_client_register_client_callback;
-    gattc_cb->scan_result = app_client_vmt_scan_result_callback ;
-    gattc_cb->connection = app_client_connection_callback;
-    gattc_cb->listen = app_client_listen_callback;
-    gattc_cb->set_advertisement_data = app_client_set_adv_data_callback;
-    gattc_cb->search_complete = app_client_search_complete_callback;
-    gattc_cb->search_result = app_client_search_result_callback;
-    gattc_cb->get_characteristic = app_client_get_characteristic_callback;
-    gattc_cb->get_descriptor = app_client_get_descriptor_callback;
+    gattc_cb->register_client = app_client_register_client_callback;            //Register client callback
+    gattc_cb->scan_result = app_client_vmt_scan_result_callback ;               //Scan Bluetooth 4.0 device callback
+    gattc_cb->connection = app_client_connection_callback;                      //Connection status callback
+    gattc_cb->listen = app_client_listen_callback;                              //Listen callback
+    gattc_cb->set_advertisement_data = app_client_set_adv_data_callback;        //Set the advertisement info callback
+    gattc_cb->search_complete = app_client_search_complete_callback;            //Search services has ended callback
+    gattc_cb->search_result = app_client_search_result_callback;                //Search services on going callback
+    gattc_cb->get_characteristic = app_client_get_characteristic_callback;      //Get service's characteristic callback
+    gattc_cb->get_descriptor = app_client_get_descriptor_callback;              //Get service's descriptor callback.
     gattc_cb->get_included_service = app_client_get_included_service_callback;
-    gattc_cb->register_for_notification = app_client_register_for_notification_callback;
+    gattc_cb->register_for_notification = app_client_register_for_notification_callback;  //Register notification callback
     gattc_cb->notify = app_client_notify_callback;
     gattc_cb->read_characteristic = app_client_read_characteristic_callback;
     gattc_cb->write_characteristic = app_client_write_characteristic_callback;
     gattc_cb->read_descriptor = app_client_read_descriptor_callback;
     gattc_cb->write_descriptor = app_client_write_descriptor_callback;
     gattc_cb->execute_write = app_client_execute_write_callback;
-    gattc_cb->read_remote_rssi = app_client_read_remote_rssi_callback;
+    gattc_cb->read_remote_rssi = app_client_read_remote_rssi_callback;          //Read remote Bluetooth 4.0 RSSI callback
     gattc_cb->get_device_type = app_client_get_device_type_callback;
     return;
 }
@@ -155,7 +156,6 @@ void app_client_check_bt_on_off(void)
     {
         vm_bt_cm_switch_on();//Switches on the Bluetooth chipset. It also activates the Bluetooth profiles that are registered to the Connection Manager.
     }
-
 }
 void app_client_bt_init_cb(VMUINT evt,void * param,void * user_data)
 {
@@ -165,6 +165,14 @@ void app_client_bt_init_cb(VMUINT evt,void * param,void * user_data)
     }
 }
 
+/*************************************************************************************
+ * 客户端初始化
+ * 1.检查是否开启，如果状态是未开启则。。。
+ * 2.改状态为正在使能
+ * 3.获得uid
+ * 4.为GTAA服务函数需要返回的结构体初始化
+ * 5.注册client服务
+ *************************************************************************************/
 
 
 void app_client_init(void)
@@ -176,7 +184,7 @@ void app_client_init(void)
         g_appc_cntx.state = APPC_STATUS_ENABLING;
         memset(g_appc_cntx.uid,0x0,sizeof(g_appc_cntx.uid));
         memcpy(g_appc_cntx.uid, g_appc_uid, sizeof(g_appc_cntx.uid));
-        app_client_callback_init(&g_appc_cb);
+        app_client_callback_init(&g_appc_cb);//注册一堆整个BLE工作中需要用到的回调函数
         vm_bt_gatt_client_register(g_appc_cntx.uid, &g_appc_cb);
         vm_log_debug("[AppClient] appc_init_end");
     }
@@ -188,24 +196,24 @@ void app_client_register_client_callback(void *context_handle, VMBOOL status, VM
     vm_log_debug("[AppClient] reg status %d state %d!\n", status, g_appc_cntx.state);
     if(memcmp(app_uuid, g_appc_cntx.uid, sizeof(g_appc_cntx.uid)) == 0)
     {
-        if(g_appc_cntx.state == APPC_STATUS_ENABLING)
+        if(g_appc_cntx.state == APPC_STATUS_ENABLING)//如果是正在使能
         {
-            if(status == 0)
+            if(status == 0)//使能成功
             {
                 vm_log_debug("[AppClient] reg status_ok %d state_ok %d!\n", status, g_appc_cntx.state);
                 g_appc_cntx.context_handle = context_handle;
-                g_appc_cntx.state = APPC_STATUS_ENABLED;
-                vm_bt_gatt_client_scan(context_handle, VM_TRUE);
+                g_appc_cntx.state = APPC_STATUS_ENABLED;//更新为使能成功
+                vm_bt_gatt_client_scan(context_handle, VM_TRUE);//开启或关闭BLE，VM_TRUE为开启
             }
             else
             {
                 g_appc_cntx.context_handle = NULL;
-                g_appc_cntx.state = APPC_STATUS_DISABLED;
+                g_appc_cntx.state = APPC_STATUS_DISABLED;//设置状态为失能
             }
         }
-        else if(g_appc_cntx.state == APPC_STATUS_DISABLING)
+        else if(g_appc_cntx.state == APPC_STATUS_DISABLING)//如果状态是正在关闭
         {
-            if(status == 0)
+            if(status == 0)//失能成功
             {
                 g_appc_cntx.context_handle = NULL;
                 g_appc_cntx.state = APPC_STATUS_DISABLED;
@@ -219,7 +227,7 @@ void app_client_register_client_callback(void *context_handle, VMBOOL status, VM
     vm_log_debug("[AppClient] reg -!\n");
 }
 
-void app_client_listen_callback(void *context_handle, VMBOOL status)
+void app_client_listen_callback(void *context_handle, VMBOOL status)//侦听
 {
     vm_log_debug("[AppClient] app_client_listen_callback status %d\n", status);
     if ((g_appc_cntx.context_handle == context_handle) && (NULL != context_handle))
@@ -257,13 +265,13 @@ void app_client_vmt_scan_result_callback(void *context_handle, vm_bt_gatt_addres
     /* Local Variables                                                */
     /*----------------------------------------------------------------*/
     VMUINT32 idx;
-    VMUINT8 server_addr[VM_BT_GATT_ADDRESS_SIZE] = {0xC9,0x92,0x65,0x46,0x5B,0x7E};
+    VMUINT8 server_addr[VM_BT_GATT_ADDRESS_SIZE] = {0xC9,0x92,0x65,0x46,0x5B,0x7E};//子设备地址
     /*----------------------------------------------------------------*/
     /* Code Body                                                      */
     /*----------------------------------------------------------------*/
     vm_log_debug("[AppClient] app_client_vmt_scan_result_callback bd_addr %x:%x:%x:%x:%x:%x!\n",
         bd_addr->data[0],bd_addr->data[1],
-    bd_addr->data[2],bd_addr->data[3],bd_addr->data[4],bd_addr->data[5]);
+    bd_addr->data[2],bd_addr->data[3],bd_addr->data[4],bd_addr->data[5]);//输出地址
     if(g_appc_cntx.context_handle == context_handle)
     {
         idx = app_client_get_free_index();
@@ -272,7 +280,14 @@ void app_client_vmt_scan_result_callback(void *context_handle, vm_bt_gatt_addres
             memcpy(&g_app_client_bd_addr_list[idx], bd_addr, sizeof(vm_bt_gatt_address_t));
 
             vm_bt_gatt_client_scan(context_handle,VM_FALSE);
+            /*
+             * Background connect (try connect in background. If the device appears, callback will be invoked.)
+             * Note that once the device is connected, background connect stops.
+             * Therefore, to continuously searching for a certain device, call vm_bt_gatt_client_connect
+             * vm_bt_gatt_client_connect with direct set to FALSE when receiving
+            */
             vm_bt_gatt_client_connect(context_handle, bd_addr, VM_TRUE);
+
             vm_log_debug("[AppClient] dev index:%d\n", idx);
         }
     }
@@ -287,11 +302,11 @@ void app_client_connection_callback(vm_bt_gatt_connection_t *conn, VMBOOL connec
     {
         vm_log_debug("[AppClient] find in list!\n");
         g_appc_conn_cntx->connection_handle = conn->connection_handle;
-        if(connected  && (g_appc_conn_cntx->conn_status != APPC_STATUS_CONNECTED))
+        if(connected  && (g_appc_conn_cntx->conn_status != APPC_STATUS_CONNECTED))//不是连接成功状态
         {
             /* do next step Discovery all */
             vm_log_debug("[AppClient] have connected,find in list!\n");
-            g_appc_conn_cntx->conn_status = APPC_STATUS_CONNECTING;
+            g_appc_conn_cntx->conn_status = APPC_STATUS_CONNECTING;//
             vm_bt_gatt_client_search_service(conn, NULL);
         }
         else if(!connected)
